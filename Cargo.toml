@@ -1,0 +1,10 @@
+[package]
+name = "elite_scraper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+scraper = "0.20"
+ratatui = "0.30.2"
+crossterm = "0.29"
