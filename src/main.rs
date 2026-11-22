@@ -93,6 +93,7 @@ fn parse_standings(text: &str) -> Vec<Team> {
 enum View {
     Original,
     Average,
+    Prediction,
 }
 
 fn render(frame: &mut Frame, teams: &[Team], view: View) {
@@ -103,19 +104,27 @@ fn render(frame: &mut Frame, teams: &[Team], view: View) {
     ])
     .split(frame.area());
 
-    let selected_tab = if view == View::Original { 0 } else { 1 };
-    let tabs = Tabs::new([Line::from("Original tabell"), Line::from("Poängsnitt")])
-        .select(selected_tab)
-        .highlight_style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("SHL · SVT Text-TV 358"),
-        );
+    let selected_tab = match view {
+        View::Original => 0,
+        View::Average => 1,
+        View::Prediction => 2,
+    };
+    let tabs = Tabs::new([
+        Line::from("Original tabell"),
+        Line::from("Poängsnitt"),
+        Line::from("Prognos 52 omg"),
+    ])
+    .select(selected_tab)
+    .highlight_style(
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    )
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("SHL · SVT Text-TV 358"),
+    );
     frame.render_widget(tabs, areas[0]);
 
     let mut ordered: Vec<&Team> = teams.iter().collect();
@@ -137,65 +146,119 @@ fn render(frame: &mut Frame, teams: &[Team], view: View) {
         });
     }
 
-    let mut rows = Vec::new();
-    for (index, team) in ordered.iter().enumerate() {
-        let average = if team.played > 0 {
-            team.points as f64 / team.played as f64
-        } else {
-            0.0
-        };
-        let position = index + 1;
-        rows.push(Row::new(vec![
-            position.to_string(),
-            team.name.clone(),
-            team.played.to_string(),
-            team.wins.to_string(),
-            team.losses.to_string(),
-            team.overtime_wins.to_string(),
-            team.overtime_losses.to_string(),
-            format!("{:+}", team.goal_diff),
-            team.points.to_string(),
-            format!("{average:.3}"),
-        ]));
-        if matches!(position, 6 | 10 | 12) {
-            rows.push(Row::new(vec!["────────"; 10]).style(Style::default().fg(Color::DarkGray)));
+    let (header, widths, rows, title) = match view {
+        View::Prediction => {
+            let mut rows = Vec::new();
+            for (index, team) in ordered.iter().enumerate() {
+                let average = if team.played > 0 {
+                    team.points as f64 / team.played as f64
+                } else {
+                    0.0
+                };
+                let projection = average * 52.0;
+                let position = index + 1;
+                rows.push(Row::new(vec![
+                    position.to_string(),
+                    team.name.clone(),
+                    team.played.to_string(),
+                    team.points.to_string(),
+                    format!("{average:.3}"),
+                    format!("{projection:.1}"),
+                ]));
+                if matches!(position, 6 | 10 | 12) {
+                    rows.push(
+                        Row::new(vec!["────────"; 6]).style(Style::default().fg(Color::DarkGray)),
+                    );
+                }
+            }
+            (
+                Row::new([
+                    "Plats",
+                    "Lag",
+                    "Matcher",
+                    "Poäng nu",
+                    "P/match",
+                    "Prognos P",
+                ]),
+                vec![
+                    Constraint::Length(5),
+                    Constraint::Length(18),
+                    Constraint::Length(8),
+                    Constraint::Length(9),
+                    Constraint::Length(8),
+                    Constraint::Length(10),
+                ],
+                rows,
+                "Prognos efter 52 omgångar (P/match × 52)",
+            )
         }
-    }
-
-    let header = Row::new([
-        "Plats", "Lag", "M", "V", "F", "VÖ", "FÖ", "MS", "P", "P/match",
-    ])
-    .style(
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    )
-    .bottom_margin(1);
-    let widths = [
-        Constraint::Length(5),
-        Constraint::Min(16),
-        Constraint::Length(4),
-        Constraint::Length(4),
-        Constraint::Length(4),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(8),
-    ];
-    let title = if view == View::Original {
-        "Grundserie"
-    } else {
-        "Sorterad på poängsnitt"
+        _ => {
+            let mut rows = Vec::new();
+            for (index, team) in ordered.iter().enumerate() {
+                let average = if team.played > 0 {
+                    team.points as f64 / team.played as f64
+                } else {
+                    0.0
+                };
+                let position = index + 1;
+                rows.push(Row::new(vec![
+                    position.to_string(),
+                    team.name.clone(),
+                    team.played.to_string(),
+                    team.wins.to_string(),
+                    team.losses.to_string(),
+                    team.overtime_wins.to_string(),
+                    team.overtime_losses.to_string(),
+                    format!("{:+}", team.goal_diff),
+                    team.points.to_string(),
+                    format!("{average:.3}"),
+                ]));
+                if matches!(position, 6 | 10 | 12) {
+                    rows.push(
+                        Row::new(vec!["────────"; 10]).style(Style::default().fg(Color::DarkGray)),
+                    );
+                }
+            }
+            (
+                Row::new([
+                    "Plats", "Lag", "M", "V", "F", "VÖ", "FÖ", "MS", "P", "P/match",
+                ]),
+                vec![
+                    Constraint::Length(5),
+                    Constraint::Length(18),
+                    Constraint::Length(4),
+                    Constraint::Length(4),
+                    Constraint::Length(4),
+                    Constraint::Length(5),
+                    Constraint::Length(5),
+                    Constraint::Length(5),
+                    Constraint::Length(5),
+                    Constraint::Length(8),
+                ],
+                rows,
+                if view == View::Original {
+                    "Grundserie"
+                } else {
+                    "Sorterad på poängsnitt"
+                },
+            )
+        }
     };
+    let header = header
+        .style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+        .bottom_margin(1);
     let table = Table::new(rows, widths)
         .header(header)
-        .column_spacing(1)
+        .column_spacing(0)
         .block(Block::default().borders(Borders::ALL).title(title));
     frame.render_widget(table, areas[1]);
 
     let help = Paragraph::new(
-        "←/→ eller Tab: växla tabell   O: original   S: poängsnitt   Q/Esc: avsluta",
+        "←/→ eller Tab: växla   O: original   S: poängsnitt   P: prognos   Q/Esc: avsluta",
     )
     .block(Block::default().borders(Borders::ALL));
     frame.render_widget(help, areas[2]);
@@ -208,15 +271,23 @@ fn run_tui(teams: &[Team]) -> Result<(), Box<dyn Error>> {
         if let Event::Key(key) = event::read()? {
             match key.code {
                 KeyCode::Char('q') | KeyCode::Esc => return Ok::<(), std::io::Error>(()),
-                KeyCode::Tab | KeyCode::Right | KeyCode::Left => {
-                    view = if view == View::Original {
-                        View::Average
-                    } else {
-                        View::Original
+                KeyCode::Tab | KeyCode::Right => {
+                    view = match view {
+                        View::Original => View::Average,
+                        View::Average => View::Prediction,
+                        View::Prediction => View::Original,
+                    };
+                }
+                KeyCode::Left => {
+                    view = match view {
+                        View::Original => View::Prediction,
+                        View::Average => View::Original,
+                        View::Prediction => View::Average,
                     };
                 }
                 KeyCode::Char('o') => view = View::Original,
                 KeyCode::Char('s') => view = View::Average,
+                KeyCode::Char('p') => view = View::Prediction,
                 _ => {}
             }
         }
